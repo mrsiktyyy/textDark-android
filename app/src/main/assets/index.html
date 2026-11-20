@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>textDark</title>
+<style>
+:root{
+  --bg:#0b0d12; --ink:#eef1f8; --dim:#9aa3b8; --acc:#7aa2ff;
+  --glass:rgba(255,255,255,.08); --glass2:rgba(255,255,255,.14); --edge:rgba(255,255,255,.18);
+  --blur:blur(28px) saturate(170%);
+  --fs:16px; --ff:"Roboto Flex",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--ff);overflow:hidden}
+#blobs{position:fixed;inset:0;z-index:0;overflow:hidden}
+#blobs i{position:absolute;border-radius:50%;filter:blur(60px);opacity:.55}
+#blobs i:nth-child(1){width:60vw;height:60vw;left:-15vw;top:-10vw;background:var(--acc)}
+#blobs i:nth-child(2){width:55vw;height:55vw;right:-20vw;top:30vh;background:#b07aff}
+#blobs i:nth-child(3){width:50vw;height:50vw;left:10vw;bottom:-15vw;background:#3fd1c0}
+#app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;gap:10px;padding:10px}
+.glass{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--edge);box-shadow:0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.18)}
+#tabs{display:flex;gap:6px;padding:6px;border-radius:30px;overflow-x:auto;scrollbar-width:none;flex:none}
+#tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;max-width:180px;padding:9px 16px;border-radius:24px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim);border:1px solid transparent}
+.tab.on{background:var(--glass2);color:var(--ink);border-color:var(--edge)}
+.tab.dirty::after{content:" ●";color:var(--acc)}
+#stage{flex:1;min-height:0;border-radius:32px;position:relative;overflow:hidden}
+#code{position:absolute;inset:0;display:none}
+#gutter,#hl,#ta{position:absolute;top:0;bottom:0;margin:0;padding:18px 0;font:var(--fs)/1.55 ui-monospace,"Roboto Mono",monospace;white-space:pre;tab-size:4;border:0}
+#gutter{left:0;width:46px;text-align:right;padding-right:8px;color:var(--dim);overflow:hidden;opacity:.7}
+#hl,#ta{left:46px;right:0;padding-left:8px;padding-right:18px;overflow:auto}
+#hl{pointer-events:none;color:var(--ink);overflow:hidden}
+#ta{background:transparent;color:transparent;caret-color:var(--ink);resize:none;outline:none}
+#ta::selection{background:rgba(122,162,255,.4);color:transparent}
+.k{color:#ff8fb1}.s{color:#9be3a4}.c{color:#7d869c}.n{color:#ffcf87}
+#note{position:absolute;inset:0;display:none;overflow:auto;padding:22px;outline:none;font-size:var(--fs);line-height:1.6}
+#note img{max-width:100%;border-radius:18px}
+#note blockquote{margin:10px 0;padding:6px 14px;border-left:3px solid var(--acc);color:var(--dim)}
+#note a{color:var(--acc)}
+#note table{border-collapse:collapse;width:100%;margin:10px 0}
+#note td{border:1px solid var(--edge);padding:8px;min-width:60px}
+#note table.nov td{border-left-color:transparent;border-right-color:transparent}
+#note table.noh td{border-top-color:transparent;border-bottom-color:transparent}
+#dock{display:flex;justify-content:center;gap:10px;padding:8px;border-radius:40px;align-self:center;flex:none}
+.rb{width:52px;height:52px;border-radius:50%;border:1px solid var(--edge);background:var(--glass);color:var(--ink);font:600 18px var(--ff);display:grid;place-items:center;
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+.rb:active{background:var(--glass2);transform:scale(.94)}
+.rb.on{background:var(--acc);color:#0b0d12}
+#sheet{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);z-index:5;border-radius:32px;padding:14px;display:none;max-height:55vh;overflow:auto}
+#sheet.show{display:block}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pill{padding:11px 18px;border-radius:26px;border:1px solid var(--edge);background:var(--glass);color:var(--ink);font:500 14px var(--ff)}
+.pill:active,.pill.on{background:var(--acc);color:#0b0d12}
+.pill.rd{color:#ff9aa8}
+h4{margin:10px 6px 8px;font-size:13px;font-weight:500;color:var(--dim)}
+input[type=text],input[type=number],select{width:100%;padding:13px 18px;border-radius:26px;border:1px solid var(--edge);background:var(--glass);color:var(--ink);font:15px var(--ff);margin-bottom:8px;outline:none}
+select option{color:#000}
+#term{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 70px);bottom:calc(env(safe-area-inset-bottom,0px) + 86px);z-index:4;border-radius:32px;padding:16px;display:none;flex-direction:column;background:rgba(10,12,18,.55)}
+#term.show{display:flex}
+#out{flex:1;overflow:auto;white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace;color:#cfe3ff;margin:0 0 10px}
+#toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:9;padding:10px 20px;border-radius:26px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+.swatch{width:40px;height:40px;border-radius:50%;border:2px solid var(--edge)}
+.card{flex:1;padding:16px;border-radius:26px;border:1px solid var(--edge);background:var(--glass);text-align:center;font-size:15px}
+.card.on{background:var(--acc);color:#0b0d12}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="blobs"><i></i><i></i><i></i></div>
+<div id="app">
+  <div id="tabs" class="glass"></div>
+  <div id="stage" class="glass">
+    <div id="code"><pre id="gutter"></pre><pre id="hl"></pre><textarea id="ta" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>
+    <div id="note" contenteditable="true"></div>
+  </div>
+  <div id="dock" class="glass">
+    <button class="rb" id="bNew" aria-label="Новый">+</button>
+    <button class="rb" id="bOpen" aria-label="Открыть">↥</button>
+    <button class="rb" id="bSave" aria-label="Сохранить">↧</button>
+    <button class="rb" id="bFmt" aria-label="Форматирование">Aa</button>
+    <button class="rb" id="bFind" aria-label="Поиск">⌕</button>
+    <button class="rb" id="bMore" aria-label="Меню">⋯</button>
+  </div>
+</div>
+<div id="sheet" class="glass"></div>
+<div id="term" class="glass"><pre id="out"></pre><input id="stdin" type="text" placeholder="Ввод для input()"><div class="row"><button class="pill" id="tRun">▶ Запустить</button><button class="pill" id="tClose">Закрыть</button></div></div>
+<div id="toast" class="glass"></div>
+
+<script>
+"use strict";
+/* ================= .txtd кодек (совместим с textDark 3.3 для ПК) =================
+   Файл: MAGIC "TEXTDARK\x02" | nonce 12 байт | AES-256-GCM(шифртекст+тег), AAD = MAGIC.
+   Содержимое: обычный текст ИЛИ "TEXTDARK_RICH_HTML_V1\n" + HTML (режим «Блокнот»). */
+const TXTD_KEY_HEX = "8f2c7a4d1b9e6035a6d0c4f8721e9b3a5c8d2f701a4e96b3d7c0f5829a1e6d4b";
+const MAGIC = new TextEncoder().encode("TEXTDARK\x02"), NONCE_LEN = 12;
+const RICH = "TEXTDARK_RICH_HTML_V1\n";
+const enc = new TextEncoder(), dec = new TextDecoder();
+const hex2buf = h => new Uint8Array(h.match(/../g).map(b => parseInt(b, 16)));
+const key = () => crypto.subtle.importKey("raw", hex2buf(TXTD_KEY_HEX), "AES-GCM", false, ["encrypt","decrypt"]);
+const hasMagic = u => MAGIC.every((v,i)=>u[i]===v);
+async function txtdDecode(bytes){
+  if(!hasMagic(bytes)) return dec.decode(bytes);            // старый .txtd без шифрования
+  const iv = bytes.slice(MAGIC.length, MAGIC.length+NONCE_LEN), ct = bytes.slice(MAGIC.length+NONCE_LEN);
+  const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv, additionalData:MAGIC}, await key(), ct);
+  return dec.decode(pt);
+}
+async function txtdEncode(text){
+  const iv = crypto.getRandomValues(new Uint8Array(NONCE_LEN));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv, additionalData:MAGIC}, await key(), enc.encode(text)));
+  const out = new Uint8Array(MAGIC.length+NONCE_LEN+ct.length); out.set(MAGIC); out.set(iv,MAGIC.length); out.set(ct,MAGIC.length+NONCE_LEN); return out;
+}
+/* HTML ПК -> содержимое редактора блокнота */
+function richToNote(h){ const d=new DOMParser().parseFromString(h,"text/html"); d.querySelectorAll("style,script").forEach(x=>x.remove());
+  d.querySelectorAll("[style]").forEach(x=>{ x.style.removeProperty("color"); x.style.removeProperty("background-color"); x.style.removeProperty("font-family"); x.style.removeProperty("font-size"); });
+  d.querySelectorAll("td").forEach(td=>{ if(!td.innerHTML.trim()) td.innerHTML="<br>"; });
+  return d.body.innerHTML; }
+/* редактор блокнота -> HTML для ПК (границы таблиц задаются у каждой ячейки) */
+function noteToRich(){ const c=$("note").cloneNode(true);
+  c.querySelectorAll("table").forEach(t=>{ const nv=t.classList.contains("nov"), nh=t.classList.contains("noh");
+    t.setAttribute("border","0"); t.setAttribute("cellspacing","0"); t.setAttribute("cellpadding","4"); t.style.borderCollapse="collapse";
+    t.querySelectorAll("td").forEach(td=>{ const L="1px solid #4a5163", N="none";
+      td.style.borderLeft=nv?N:L; td.style.borderRight=nv?N:L; td.style.borderTop=nh?N:L; td.style.borderBottom=nh?N:L; }); });
+  return RICH+"<!DOCTYPE HTML><html><head><meta charset=\"utf-8\"></head><body>"+c.innerHTML+"</body></html>"; }
+const b64e = u8 => { let s=""; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); };
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+/* ================= состояние ================= */
+const $ = id => document.getElementById(id);
+const S = JSON.parse(localStorage.getItem("td_settings") || '{"mode":"code","fs":16,"ff":"system-ui","acc":"#7aa2ff"}');
+let tabs = [], cur = 0, uid = 1;
+const saveSettings = () => { localStorage.setItem("td_settings", JSON.stringify(S));
+  const r = document.documentElement.style; r.setProperty("--fs", S.fs+"px"); r.setProperty("--acc", S.acc); r.setProperty("--ff", S.ff); };
+saveSettings();
+const toast = t => { const e=$("toast"); e.textContent=t; e.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>e.classList.remove("show"),2200); };
+const T = () => tabs[cur];
+
+function newTab(name, mode, content, uri){
+  tabs.push({id:uid++, name:name||"Без имени", mode:mode||S.mode, content:content||"", uri:uri||"", dirty:false});
+  cur = tabs.length-1; render();
+}
+function pull(){ const t=T(); if(!t) return; t.content = t.mode==="note" ? $("note").innerHTML : $("ta").value; }
+function render(){
+  const t = T();
+  $("tabs").innerHTML = tabs.map((x,i)=>`<div class="tab ${i===cur?"on":""} ${x.dirty?"dirty":""}" data-i="${i}">${esc(x.name)}</div>`).join("");
+  $("code").style.display = t.mode==="code" ? "block" : "none";
+  $("note").style.display = t.mode==="note" ? "block" : "none";
+  if(t.mode==="code"){ $("ta").value = t.content; hl(); } else $("note").innerHTML = t.content;
+  const on = tabs[cur]; document.querySelector(".tab.on")?.scrollIntoView({inline:"center"});
+}
+const esc = s => s.replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+$("tabs").onclick = e => { const i=e.target.dataset.i; if(i===undefined) return;
+  if(+i===cur) return closeTabMenu(); pull(); cur=+i; render(); };
+function closeTabMenu(){ openSheet(`<h4>${esc(T().name)}</h4><div class="row">
+  <button class="pill" data-a="rename">Переименовать</button><button class="pill rd" data-a="close">Закрыть вкладку</button></div>`, a=>{
+  if(a==="rename"){ const n=prompt("Имя файла", T().name); if(n){T().name=n; render();} }
+  if(a==="close"){ tabs.splice(cur,1); if(!tabs.length) newTab(); cur=Math.max(0,cur-1); render(); } hideSheet(); }); }
+
+/* ================= код-режим ================= */
+const KW = /\b(def|class|return|if|elif|else|for|while|import|from|as|in|not|and|or|try|except|finally|with|lambda|None|True|False|function|const|let|var|new|this|public|private|static|void|int|string|using|namespace|fn|pub|match)\b/g;
+function hl(){
+  const v = $("ta").value;
+  let h = esc(v).replace(/(&quot;[^\n]*?&quot;|'[^'\n]*'|#[^\n]*|\/\/[^\n]*)/g, m => /^(#|\/\/)/.test(m) ? `<span class=c>${m}</span>` : `<span class=s>${m}</span>`)
+    .replace(KW, '<span class=k>$&</span>').replace(/\b(\d+)\b/g,'<span class=n>$1</span>');
+  $("hl").innerHTML = h + "\n";
+  $("gutter").textContent = Array.from({length:v.split("\n").length},(_, i)=>i+1).join("\n");
+  syncScroll();
+}
+function syncScroll(){ $("hl").scrollTop=$("ta").scrollTop; $("hl").scrollLeft=$("ta").scrollLeft; $("gutter").scrollTop=$("ta").scrollTop; }
+$("ta").addEventListener("scroll", syncScroll);
+$("ta").addEventListener("input", e => { T().dirty=true; markDirty(); hl();
+  const ta=$("ta"), p=ta.selectionStart, pairs={"(":")","[":"]","{":"}",'"':'"',"'":"'"};
+  if(e.inputType==="insertText" && pairs[e.data]){ ta.setRangeText(pairs[e.data], p, p, "start"); hl(); } });
+$("ta").addEventListener("keydown", e => { if(e.key==="Tab"){ e.preventDefault(); const ta=$("ta"); ta.setRangeText("    ", ta.selectionStart, ta.selectionEnd, "end"); hl(); } });
+$("note").addEventListener("input", () => { T().dirty=true; markDirty(); });
+function markDirty(){ document.querySelector(".tab.on")?.classList.add("dirty"); }
+
+/* ================= панели ================= */
+function openSheet(html, handler){ const s=$("sheet"); s.innerHTML=html; s.classList.add("show"); s.onclick=e=>{ const a=e.target.dataset?.a; if(a&&handler) handler(a,e.target); }; }
+function hideSheet(){ $("sheet").classList.remove("show"); }
+document.addEventListener("pointerdown", e => { if(!e.target.closest("#sheet,#dock,#tabs,#term")) hideSheet(); });
+
+const fmt = (c,v) => { $("note").focus(); document.execCommand(c,false,v); T().dirty=true; markDirty(); };
+$("bFmt").onclick = () => {
+  if(T().mode==="code"){ openSheet(`<h4>Строки</h4><div class="row">
+    <button class="pill" data-a="dup">Дублировать</button><button class="pill" data-a="del">Удалить</button>
+    <button class="pill" data-a="up">Вверх</button><button class="pill" data-a="down">Вниз</button>
+    <button class="pill" data-a="sort">Сортировать</button><button class="pill" data-a="trim">Обрезать пробелы</button>
+    <button class="pill" data-a="upper">ПРОПИСНЫЕ</button><button class="pill" data-a="lower">строчные</button>
+    <button class="pill" data-a="run">▶ Python</button></div>`, a => lineOp(a)); return; }
+  openSheet(`<div class="row">
+    <button class="pill" data-a="b"><b>B</b></button><button class="pill" data-a="i"><i>I</i></button><button class="pill" data-a="u"><u>U</u></button>
+    <button class="pill" data-a="h">Заголовок</button><button class="pill" data-a="ul">• Список</button><button class="pill" data-a="ol">1. Список</button>
+    <button class="pill" data-a="q">Цитата</button><button class="pill" data-a="link">Ссылка</button><button class="pill" data-a="img">Картинка</button>
+    <button class="pill" data-a="clr">Очистить</button></div>
+    <h4>Таблица</h4><div class="row"><button class="pill" data-a="tnew">Создать</button><button class="pill" data-a="r+">+ строка</button><button class="pill" data-a="r-">− строка</button>
+    <button class="pill" data-a="c+">+ столбец</button><button class="pill" data-a="c-">− столбец</button><button class="pill" data-a="mg">Объединить →</button>
+    <button class="pill" data-a="sp">Разделить</button><button class="pill" data-a="nv">Без верт. линий</button><button class="pill" data-a="nh">Без гориз. линий</button></div>`,
+  a => noteOp(a));
+};
+function noteOp(a){
+  const m={b:"bold",i:"italic",u:"underline",ul:"insertUnorderedList",ol:"insertOrderedList"};
+  if(m[a]) return fmt(m[a]);
+  if(a==="h"){ const cb=document.queryCommandValue("formatBlock").toLowerCase(); return fmt("formatBlock", cb==="h2"?"p":"h2"); }
+  if(a==="q") return fmt("formatBlock","blockquote");
+  if(a==="clr") return fmt("removeFormat");
+  if(a==="link"){ const u=prompt("Адрес ссылки","https://"); if(u) fmt("createLink",u); return; }
+  if(a==="img") return pickImage();
+  if(a==="tnew"){ openSheet(`<h4>Новая таблица</h4><input id="tr" type="number" value="3" min="1"><input id="tc" type="number" value="3" min="1"><div class="row"><button class="pill" data-a="mk">Вставить</button></div>`,
+    x=>{ if(x==="mk"){ const r=+$("tr").value,c=+$("tc").value; fmt("insertHTML","<table>"+("<tr>"+"<td><br></td>".repeat(c)+"</tr>").repeat(r)+"</table><p><br></p>"); hideSheet(); } }); return; }
+  const cell = (()=>{ const n=getSelection().anchorNode; return n && (n.nodeType===1?n:n.parentElement).closest("td"); })();
+  if(!cell) return toast("Поставьте курсор в ячейку");
+  const row=cell.parentElement, tbl=cell.closest("table"), ci=[...row.children].indexOf(cell);
+  if(a==="r+"){ const nr=row.cloneNode(true); nr.querySelectorAll("td").forEach(td=>{td.innerHTML="<br>";td.colSpan=1;}); row.after(nr); }
+  if(a==="r-"){ row.remove(); if(!tbl.rows.length) tbl.remove(); }
+  if(a==="c+") [...tbl.rows].forEach(r=>{ const td=document.createElement("td"); td.innerHTML="<br>"; r.cells[Math.min(ci,r.cells.length-1)].after(td); });
+  if(a==="c-") [...tbl.rows].forEach(r=>r.cells[ci]?.remove());
+  if(a==="mg"&&cell.nextElementSibling){ const n=cell.nextElementSibling; cell.colSpan=(cell.colSpan||1)+(n.colSpan||1); cell.innerHTML+=n.innerHTML.replace(/^<br>$/,""); n.remove(); }
+  if(a==="sp"&&cell.colSpan>1){ const k=cell.colSpan-1; cell.colSpan=1; for(let i=0;i<k;i++){ const td=document.createElement("td"); td.innerHTML="<br>"; cell.after(td); } }
+  if(a==="nv") tbl.classList.toggle("nov");
+  if(a==="nh") tbl.classList.toggle("noh");
+  T().dirty=true; markDirty();
+}
+function pickImage(){ const f=document.createElement("input"); f.type="file"; f.accept="image/*";
+  f.onchange=()=>{ const r=new FileReader(); r.onload=()=>fmt("insertImage",r.result); r.readAsDataURL(f.files[0]); }; f.click(); }
+$("note").addEventListener("paste", e => { const it=[...e.clipboardData.items].find(i=>i.type.startsWith("image/")); if(it){ e.preventDefault(); const r=new FileReader(); r.onload=()=>fmt("insertImage",r.result); r.readAsDataURL(it.getAsFile()); } });
+$("note").addEventListener("click", e => { const a=e.target.closest("a"); if(a){ e.preventDefault(); window.open(a.href,"_blank"); } });
+
+function lineOp(a){
+  const ta=$("ta"), v=ta.value; let s=v.lastIndexOf("\n",ta.selectionStart-1)+1, e=v.indexOf("\n",ta.selectionEnd); if(e<0)e=v.length;
+  const sel=v.slice(s,e), L=sel.split("\n"); let r=sel, whole=false;
+  if(a==="run"){ hideSheet(); return openTerm(); }
+  if(a==="dup") r=sel+"\n"+sel;
+  if(a==="del") r="", whole=true;
+  if(a==="sort") r=L.sort((x,y)=>x.localeCompare(y)).join("\n");
+  if(a==="trim") r=L.map(x=>x.trimEnd()).join("\n");
+  if(a==="upper") r=sel.toUpperCase(); if(a==="lower") r=sel.toLowerCase();
+  if(a==="up"||a==="down"){ const ls=v.split("\n"); const idx=v.slice(0,s).split("\n").length-1, n=L.length, d=a==="up"?-1:1;
+    if(idx+d<0||idx+d+n>ls.length) return; const blk=ls.splice(idx,n); ls.splice(idx+d,0,...blk); ta.value=ls.join("\n"); T().dirty=true; markDirty(); return hl(); }
+  ta.setRangeText(whole?"":r, s, whole?Math.min(e+1,v.length):e, "select"); T().dirty=true; markDirty(); hl();
+}
+
+/* поиск / замена */
+$("bFind").onclick = () => { openSheet(`<input id="fq" type="text" placeholder="Найти"><input id="fr" type="text" placeholder="Заменить на">
+  <div class="row"><button class="pill" data-a="n">Найти далее</button><button class="pill" data-a="r">Заменить все</button></div>`, a=>{
+  const q=$("fq").value, r=$("fr").value; if(!q) return;
+  if(a==="n"){ if(T().mode==="note") return window.find(q) || toast("Не найдено");
+    const ta=$("ta"); let i=ta.value.indexOf(q, ta.selectionEnd); if(i<0) i=ta.value.indexOf(q); if(i<0) return toast("Не найдено");
+    ta.focus(); ta.setSelectionRange(i,i+q.length); }
+  if(a==="r"){ let n=0;
+    if(T().mode==="note"){ const w=document.createTreeWalker($("note"),NodeFilter.SHOW_TEXT); let x; while(x=w.nextNode()){ const t=x.nodeValue.split(q).join(r); if(t!==x.nodeValue){ n++; x.nodeValue=t; } } }
+    else { const p=$("ta").value.split(q).length-1; n=p; $("ta").value=$("ta").value.split(q).join(r); hl(); }
+    T().dirty=true; markDirty(); toast("Замен: "+n); } }); };
+
+/* меню */
+$("bMore").onclick = () => { openSheet(`<div class="row">
+  <button class="pill" data-a="mode">Режим: ${T().mode==="code"?"Программирование":"Блокнот"}</button>
+  <button class="pill" data-a="stat">Статистика</button><button class="pill" data-a="z+">A+</button><button class="pill" data-a="z-">A−</button>
+  <button class="pill" data-a="set">Настройки</button><button class="pill" data-a="saveas">Сохранить как…</button></div>`, a=>{
+  if(a==="mode"){ pull(); const t=T(); t.mode = t.mode==="code"?"note":"code";
+    if(t.mode==="note") t.content = esc(t.content).replace(/\n/g,"<br>"); else { const d=document.createElement("div"); d.innerHTML=t.content.replace(/<br>/g,"\n").replace(/<\/(p|div|h\d|li|tr)>/g,"\n"); t.content=d.textContent; }
+    render(); hideSheet(); }
+  if(a==="stat"){ pull(); const t=T(); const txt = t.mode==="note"? $("note").innerText : t.content;
+    toast(`Слов: ${(txt.trim().match(/\S+/g)||[]).length} · Символов: ${txt.length} · Строк: ${txt.split("\n").length}`); hideSheet(); }
+  if(a==="z+"){ S.fs=Math.min(32,S.fs+1); saveSettings(); } if(a==="z-"){ S.fs=Math.max(10,S.fs-1); saveSettings(); }
+  if(a==="set") settings(); if(a==="saveas"){ T().uri=""; save(); hideSheet(); } }); };
+function settings(){
+  openSheet(`<h4>Режим по умолчанию</h4><div class="row"><div class="card ${S.mode==="code"?"on":""}" data-a="mc">Программирование</div><div class="card ${S.mode==="note"?"on":""}" data-a="mn">Блокнот</div></div>
+  <h4>Шрифт</h4><select id="sf"><option value="system-ui">Системный</option><option value="Georgia,serif">Serif</option><option value="ui-monospace,monospace">Моноширинный</option></select>
+  <h4>Акцент</h4><div class="row">${["#7aa2ff","#b07aff","#3fd1c0","#ff8fb1","#ffcf87"].map(c=>`<div class="swatch" data-a="c${c}" style="background:${c}"></div>`).join("")}</div>`,
+  (a,el)=>{ if(a==="mc"||a==="mn"){ S.mode=a==="mc"?"code":"note"; } else if(a.startsWith("c#")) S.acc=a.slice(1); saveSettings(); settings(); });
+  $("sf").value=S.ff; $("sf").onchange=e=>{ S.ff=e.target.value; saveSettings(); };
+}
+
+/* ================= файлы ================= */
+$("bNew").onclick = () => { pull(); newTab(); };
+$("bOpen").onclick = () => window.Android ? Android.openFile() : toast("Доступно только в приложении");
+window.onOpened = async (name, b64, uri) => {
+  pull(); const bytes=b64d(b64); const txtd=/\.txtd$/i.test(name)||hasMagic(bytes);
+  let text;
+  try{ text = txtd ? await txtdDecode(bytes) : dec.decode(bytes); }catch(e){ return toast("Не удалось расшифровать файл"); }
+  if(text.startsWith(RICH)){ newTab(name,"note",richToNote(text.slice(RICH.length)),uri); }
+  else if(txtd && S.mode==="note"){ newTab(name,"note",esc(text).replace(/\n/g,"<br>"),uri); }
+  else newTab(name,"code",text,uri);
+};
+async function save(){
+  pull(); const t=T(); let name=t.name, data;
+  if(t.mode==="note"){ if(!/\.txtd$/i.test(name)) name=name.replace(/\.[^.]+$/,"")+".txtd"; data=await txtdEncode(noteToRich()); }
+  else if(/\.txtd$/i.test(name)) data=await txtdEncode(t.content);
+  else data=enc.encode(t.content);
+  if(!window.Android) return toast("Доступно только в приложении");
+  Android.saveFile(name, b64e(data), t.uri||"");
+}
+$("bSave").onclick = save;
+window.onSaved = (name, uri) => { const t=T(); t.name=name; t.uri=uri; t.dirty=false; render(); toast("Сохранено"); localStorage.removeItem("td_rec"); };
+
+/* ================= терминал Python (Pyodide, нужен интернет при первом запуске) ================= */
+let py = null;
+function openTerm(){ $("term").classList.add("show"); }
+$("tClose").onclick = () => $("term").classList.remove("show");
+$("tRun").onclick = async () => {
+  const ta=$("ta"), code = ta.selectionStart!==ta.selectionEnd ? ta.value.slice(ta.selectionStart,ta.selectionEnd) : ta.value;
+  const out=$("out"); out.textContent="";
+  try{
+    if(!py){ out.textContent="Загрузка Python…\n";
+      await new Promise((ok,no)=>{ const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"; s.onload=ok; s.onerror=()=>no(new Error("Нет сети для загрузки Python")); document.head.appendChild(s); });
+      py = await loadPyodide(); out.textContent=""; }
+    py.setStdout({batched:s=>{out.textContent+=s+"\n";}}); py.setStderr({batched:s=>{out.textContent+=s+"\n";}});
+    const lines=$("stdin").value.split("\n"); let li=0; py.setStdin({stdin:()=>li<lines.length?lines[li++]:""});
+    await py.runPythonAsync(code);
+  }catch(e){ out.textContent+=String(e.message||e); }
+};
+
+/* ================= автосохранение / восстановление ================= */
+setInterval(()=>{ try{ if(tabs.some(t=>t.dirty)){ pull(); localStorage.setItem("td_rec", JSON.stringify(tabs)); } }catch(e){} }, 4000);
+window.onBack = () => { if($("term").classList.contains("show")) $("term").classList.remove("show"); else if($("sheet").classList.contains("show")) hideSheet(); };
+
+(function init(){
+  const rec = localStorage.getItem("td_rec");
+  if(rec){ try{ const r=JSON.parse(rec); if(r.length){ tabs=r; cur=0; render(); toast("Восстановлены несохранённые документы"); return; } }catch(e){} }
+  newTab("Без имени", S.mode, "");
+})();
+</script>
+</body>
+</html>
